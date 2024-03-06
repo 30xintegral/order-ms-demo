@@ -32,15 +32,24 @@ public class OrderServiceImpl implements OrderService{
         if (productResponse.getPrice()*orderRequest.getCount()> customerResponse.getBalance()){
             throw new RuntimeException("Insufficient balance");
         }
-        customerClient.decreaseBalanceBy(orderRequest.getCustomerId(), productResponse.getPrice()*orderRequest.getCount());
-        productClient.decreaseCountBy(orderRequest.getProductId(), orderRequest.getCount());
-
+        try {
+            customerClient.decreaseBalanceBy(orderRequest.getCustomerId(), productResponse.getPrice() * orderRequest.getCount());
+        }catch (RuntimeException e){
+            customerClient.increaseBalanceBy(orderRequest.getCustomerId(), productResponse.getPrice() * orderRequest.getCount());
+        }
+        try {
+            productClient.decreaseCountBy(orderRequest.getProductId(), orderRequest.getCount());
+        }catch (RuntimeException e){
+            customerClient.increaseBalanceBy(orderRequest.getCustomerId(), productResponse.getPrice() * orderRequest.getCount());
+            productClient.increaseCountBy(orderRequest.getProductId(), orderRequest.getCount());
+        }
         Order order = new Order();
         order.setCustomerId(orderRequest.getCustomerId());
         order.setProductId(orderRequest.getProductId());
         order.setCount(orderRequest.getCount());
         order.setPrice(productResponse.getPrice()*orderRequest.getCount());
         order.setOrderedAt(LocalDateTime.now());
+        orderRepository.save(order);
         return OrderMapper.INSTANCE.mapEntityToDto(order);
     }
 
